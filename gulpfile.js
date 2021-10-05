@@ -8,29 +8,43 @@ const htmlmin = require('gulp-htmlmin');
 const plumber = require('gulp-plumber');
 const sourcemaps = require('gulp-sourcemaps');
 const debug = require('gulp-debug');
+const imageResize = require('gulp-image-resize');
+
+const changed = require('gulp-changed');
 const server = require('browser-sync').create();
 const del = require('del');
 
 const fs = require('fs');
 const path = require('path');
 
-function assets(cb, configAssets) {
-  if (!configAssets) {
-    configAssets = {
-      glob: 'src/assets/**/*',
-      options: { since: lastRun(assets) },
-    };
-  }
-
-  return src(configAssets.glob, configAssets.options)
+function assetsImages() {
+  return src('src/assets/images/**/*')
     .pipe(plumber())
-    .pipe(dest('dist/assets'))
+    .pipe(
+      changed('dist/assets/images', { hasChanged: changed.compareContents })
+    )
+    .pipe(server.stream())
+    .pipe(dest('dist/assets/images'));
+}
+
+function assetsIcons() {
+  return src('src/assets/icons/**/*')
+    .pipe(plumber())
+    .pipe(changed('dist/assets/icons', { hasChanged: changed.compareContents }))
+    .pipe(dest('dist/assets/icons'))
+    .pipe(server.stream());
+}
+
+function assetsFonts() {
+  return src('src/assets/fonts/**/*')
+    .pipe(plumber())
+    .pipe(changed('dist/assets/fonts', { hasChanged: changed.compareContents }))
+    .pipe(dest('dist/assets/fonts'))
     .pipe(server.stream());
 }
 
 function js() {
   return src('src/js/**/*', { since: lastRun(js) })
-    .pipe(debug())
     .pipe(plumber())
     .pipe(dest('dist/js'))
     .pipe(server.stream());
@@ -40,7 +54,6 @@ function html() {
   return src('src/*.html', {
     since: lastRun(html),
   })
-    .pipe(debug())
     .pipe(plumber())
     .pipe(
       htmlmin({
@@ -71,33 +84,9 @@ function startWatch() {
   watch('src/*.html', html);
   watch('src/**/*.scss', styles);
   watch('src/js/**/*.js', js);
-
-  watch('src/assets/**/*').on('all', function (eventType, relativePath) {
-    if (eventType === 'add' || eventType === 'change') {
-      let filePath = path.resolve(__dirname, relativePath);
-
-      try {
-        if (fs.existsSync(filePath)) {
-          console.log(`File exist [${eventType}] =>`, relativePath);
-
-          let configAssets = {
-            glob: relativePath,
-            options: { base: 'src/assets' },
-          };
-
-          return assets(null, configAssets);
-        } else {
-          console.log('File Not Found =>', filePath);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      console.log(`Event -> ${eventType} <- [Exit]`);
-      console.log(`Path => ${filePath}`);
-      return;
-    }
-  });
+  watch('src/assets/images/**/*', series(assetsImages, server.reload));
+  watch('src/assets/icons/**/*', series(assetsIcons, server.reload));
+  watch('src/assets/fonts/**/*', series(assetsFonts, server.reload));
 }
 
 function startServer() {
@@ -127,10 +116,12 @@ exports.startWatch = startWatch;
 exports.startServer = startServer;
 exports.styles = styles;
 exports.clean = clean;
-exports.assets = assets;
+exports.assetsImages = assetsImages;
+exports.assetsFonts = assetsFonts;
+exports.assetsIcons = assetsIcons;
 
 exports.default = series(
   clean,
-  parallel(html, styles, assets, js),
+  parallel(html, styles, js, assetsImages, assetsFonts, assetsIcons),
   parallel(startServer, startWatch)
 );
