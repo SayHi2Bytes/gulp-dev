@@ -23,8 +23,8 @@ function assetsImages() {
     .pipe(
       changed('dist/assets/images', { hasChanged: changed.compareContents })
     )
-    .pipe(server.stream())
-    .pipe(dest('dist/assets/images'));
+    .pipe(dest('dist/assets/images'))
+    .pipe(server.stream());
 }
 
 function assetsIcons() {
@@ -84,9 +84,21 @@ function startWatch() {
   watch('src/*.html', html);
   watch('src/**/*.scss', styles);
   watch('src/js/**/*.js', js);
-  watch('src/assets/images/**/*', series(assetsImages, server.reload));
-  watch('src/assets/icons/**/*', series(assetsIcons, server.reload));
-  watch('src/assets/fonts/**/*', series(assetsFonts, server.reload));
+
+  watch('src/assets/images/**/*').on('all', function () {
+    assetsImages();
+    // server.reload();
+  });
+
+  watch('src/assets/icons/**/*').on('all', function () {
+    assetsIcons();
+    // server.reload();
+  });
+
+  watch('src/assets/fonts/**/*').on('all', function () {
+    assetsFonts();
+    // server.reload();
+  });
 }
 
 function startServer() {
